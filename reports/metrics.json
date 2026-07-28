@@ -1,0 +1,91 @@
+{
+  "target": "Total Individuals in Shelter",
+  "modeled_quantity": "day-over-day population change",
+  "feature_count": 27,
+  "selected_candidate": {
+    "name": "compact",
+    "hidden_layer_sizes": [
+      32
+    ],
+    "alpha": 0.001,
+    "validation": {
+      "mae": 105.35779117690431,
+      "rmse": 137.93422131623953,
+      "mape_percent": 0.12438295232742741
+    }
+  },
+  "candidate_search": [
+    {
+      "name": "compact",
+      "hidden_layer_sizes": [
+        32
+      ],
+      "alpha": 0.001,
+      "validation": {
+        "mae": 105.35779117690431,
+        "rmse": 137.93422131623953,
+        "mape_percent": 0.12438295232742741
+      }
+    },
+    {
+      "name": "two_layer",
+      "hidden_layer_sizes": [
+        64,
+        32
+      ],
+      "alpha": 0.001,
+      "validation": {
+        "mae": 182.63247847391386,
+        "rmse": 221.930736479913,
+        "mape_percent": 0.21567143478367112
+      }
+    },
+    {
+      "name": "regularized",
+      "hidden_layer_sizes": [
+        64,
+        32
+      ],
+      "alpha": 0.01,
+      "validation": {
+        "mae": 124.27508029201142,
+        "rmse": 155.52235915292854,
+        "mape_percent": 0.14655027184873545
+      }
+    }
+  ],
+  "test_metrics": {
+    "neural_network": {
+      "mae": 107.12180241019361,
+      "rmse": 137.32117289434814,
+      "mape_percent": 0.12939648420476982
+    },
+    "naive_previous_day": {
+      "mae": 118.85555555555555,
+      "rmse": 154.09149518675224,
+      "mape_percent": 0.14360463813052116
+    },
+    "seasonal_naive_7_day": {
+      "mae": 180.2111111111111,
+      "rmse": 216.4027880288668,
+      "mape_percent": 0.21764311055065583
+    }
+  },
+  "splits": {
+    "training_start": "2021-04-26",
+    "training_end": "2026-01-28",
+    "validation_start": "2026-01-29",
+    "validation_end": "2026-04-28",
+    "test_start": "2026-04-29",
+    "test_end": "2026-07-27",
+    "test_days": 90,
+    "validation_days": 90
+  },
+  "residual_interval": {
+    "method": "2.5th and 97.5th percentiles of chronological validation residuals",
+    "lower": -319.0890741120813,
+    "upper": 129.85708146795477
+  },
+  "random_state": 42,
+  "trained_through": "2026-07-27"
+}
