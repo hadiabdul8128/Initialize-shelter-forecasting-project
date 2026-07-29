@@ -69,8 +69,7 @@ button,
 }
 
 .site-header,
-main,
-footer {
+main {
   width: min(1120px, calc(100% - 40px));
   margin-inline: auto;
 }
@@ -123,7 +122,7 @@ footer {
 }
 
 main {
-  padding-block: 88px 72px;
+  padding-block: 88px 96px;
 }
 
 .hero {
@@ -142,8 +141,7 @@ main {
   text-transform: uppercase;
 }
 
-h1,
-h2 {
+h1 {
   max-width: 18ch;
   margin: 0;
   font-family: Lora, ui-serif, Georgia, serif;
@@ -154,10 +152,6 @@ h2 {
 
 h1 {
   font-size: clamp(2.75rem, 7vw, 5.8rem);
-}
-
-h2 {
-  font-size: clamp(2rem, 4vw, 3.25rem);
 }
 
 .hero-copy {
@@ -330,81 +324,6 @@ button.is-loading .button-progress {
   font-variant-numeric: tabular-nums;
 }
 
-.method {
-  display: grid;
-  grid-template-columns: 0.85fr 1.15fr;
-  gap: clamp(48px, 8vw, 112px);
-  padding-block: 112px 88px;
-}
-
-.method-grid {
-  display: grid;
-  gap: 0;
-}
-
-.method-grid article {
-  display: grid;
-  grid-template-columns: 48px 1fr;
-  gap: 0 16px;
-  padding: 24px 0;
-  border-top: 1px solid var(--border);
-}
-
-.step-number {
-  grid-row: span 2;
-  color: var(--accent);
-  font-size: 0.8rem;
-  font-weight: 800;
-}
-
-h3,
-.method-grid p {
-  margin: 0;
-}
-
-h3 {
-  font-size: 1rem;
-}
-
-.method-grid p {
-  margin-top: 6px;
-  color: var(--muted-text);
-}
-
-.notice {
-  display: flex;
-  gap: 12px 24px;
-  align-items: baseline;
-  padding: 20px 24px;
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--accent);
-  border-radius: 8px;
-  color: var(--secondary);
-  background: var(--surface);
-}
-
-.notice strong {
-  flex: none;
-  color: var(--foreground);
-}
-
-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 24px;
-  padding-block: 28px 40px;
-  border-top: 1px solid var(--border);
-  color: var(--muted-text);
-  font-size: 0.875rem;
-}
-
-footer a {
-  min-height: 44px;
-  color: var(--accent);
-  font-weight: 700;
-  text-underline-offset: 4px;
-}
-
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -413,8 +332,7 @@ footer a {
 
 @media (max-width: 760px) {
   .site-header,
-  main,
-  footer {
+  main {
     width: min(100% - 24px, 680px);
   }
 
@@ -434,8 +352,7 @@ footer a {
     margin-bottom: 32px;
   }
 
-  .estimator-shell,
-  .method {
+  .estimator-shell {
     grid-template-columns: 1fr;
   }
 
@@ -454,15 +371,6 @@ footer a {
     grid-template-columns: 1fr;
   }
 
-  .method {
-    gap: 36px;
-    padding-block: 80px 64px;
-  }
-
-  .notice,
-  footer {
-    flex-direction: column;
-  }
 }
 
 @media (prefers-color-scheme: dark) {
