@@ -1,64 +1,69 @@
 {
   "target": "Total Individuals in Shelter",
   "modeled_quantity": "day-over-day population change",
+  "primary_serving_model": "pytorch_neural_network",
   "feature_count": 27,
-  "selected_candidate": {
-    "name": "compact",
-    "hidden_layer_sizes": [
-      32
-    ],
-    "alpha": 0.001,
-    "validation": {
-      "mae": 105.35779117690431,
-      "rmse": 137.93422131623953,
-      "mape_percent": 0.12438295232742741
+  "feature_columns": [
+    "trend_days",
+    "day_of_week_sin",
+    "day_of_week_cos",
+    "day_of_year_sin",
+    "day_of_year_cos",
+    "lag_1",
+    "lag_2",
+    "lag_3",
+    "lag_7",
+    "lag_14",
+    "lag_21",
+    "lag_28",
+    "lag_56",
+    "rolling_mean_7",
+    "rolling_std_7",
+    "rolling_min_7",
+    "rolling_max_7",
+    "rolling_mean_14",
+    "rolling_std_14",
+    "rolling_min_14",
+    "rolling_max_14",
+    "rolling_mean_28",
+    "rolling_std_28",
+    "rolling_min_28",
+    "rolling_max_28",
+    "momentum_7",
+    "momentum_28"
+  ],
+  "validation_metrics": {
+    "sklearn_ridge": {
+      "mae": 105.827168197676,
+      "rmse": 134.27278064130525,
+      "mape_percent": 0.12461701618744946
+    },
+    "xgboost": {
+      "mae": 103.69104988707437,
+      "rmse": 133.67706774271724,
+      "mape_percent": 0.1221174469677662
+    },
+    "pytorch_neural_network": {
+      "mae": 86.22829791174995,
+      "rmse": 112.04511179636737,
+      "mape_percent": 0.10159768304066734
     }
   },
-  "candidate_search": [
-    {
-      "name": "compact",
-      "hidden_layer_sizes": [
-        32
-      ],
-      "alpha": 0.001,
-      "validation": {
-        "mae": 105.35779117690431,
-        "rmse": 137.93422131623953,
-        "mape_percent": 0.12438295232742741
-      }
-    },
-    {
-      "name": "two_layer",
-      "hidden_layer_sizes": [
-        64,
-        32
-      ],
-      "alpha": 0.001,
-      "validation": {
-        "mae": 182.63247847391386,
-        "rmse": 221.930736479913,
-        "mape_percent": 0.21567143478367112
-      }
-    },
-    {
-      "name": "regularized",
-      "hidden_layer_sizes": [
-        64,
-        32
-      ],
-      "alpha": 0.01,
-      "validation": {
-        "mae": 124.27508029201142,
-        "rmse": 155.52235915292854,
-        "mape_percent": 0.14655027184873545
-      }
-    }
-  ],
   "test_metrics": {
-    "neural_network": {
-      "mae": 107.12180241019361,
-      "rmse": 137.32117289434814,
-      "mape_percent": 0.12939648420476982
+    "sklearn_ridge": {
+      "mae": 124.10700230752248,
+      "rmse": 160.55139178215762,
+      "mape_percent": 0.14995152598470635
+    },
+    "xgboost": {
+      "mae": 109.66808178424836,
+      "rmse": 144.87652204965428,
+      "mape_percent": 0.13247502745313391
+    },
+    "pytorch_neural_network": {
+      "mae": 101.07175616158379,
+      "rmse": 130.74046601472773,
+      "mape_percent": 0.12210749148040245
     },
     "naive_previous_day": {
       "mae": 118.85555555555555,
@@ -69,6 +74,28 @@
       "mae": 180.2111111111111,
       "rmse": 216.4027880288668,
       "mape_percent": 0.21764311055065583
+    }
+  },
+  "model_settings": {
+    "sklearn_ridge": {
+      "alpha": 10.0
+    },
+    "xgboost": {
+      "n_estimators": 400,
+      "learning_rate": 0.03,
+      "max_depth": 3
+    },
+    "pytorch_neural_network": {
+      "hidden_sizes": [
+        64,
+        32
+      ],
+      "dropout": 0.05,
+      "optimizer": "AdamW",
+      "loss": "HuberLoss",
+      "selected_epochs": 176,
+      "maximum_epochs": 500,
+      "patience": 60
     }
   },
   "splits": {
@@ -82,10 +109,19 @@
     "validation_days": 90
   },
   "residual_interval": {
-    "method": "2.5th and 97.5th percentiles of chronological validation residuals",
-    "lower": -319.0890741120813,
-    "upper": 129.85708146795477
+    "method": "PyTorch validation residual percentiles, widened by square-root horizon",
+    "lower": -253.56620359420776,
+    "upper": 137.53905959129327
   },
   "random_state": 42,
-  "trained_through": "2026-07-27"
+  "trained_through": "2026-07-27",
+  "mlflow": {
+    "tracking_uri": "sqlite:///mlflow.db",
+    "experiment_name": "shelter-population-forecasting",
+    "run_ids": {
+      "sklearn_ridge": "db6be7cbda3b4b04a67967bb447b4f39",
+      "xgboost": "2101ba4507634f29baff9bfbca40d827",
+      "pytorch_neural_network": "5d3b9616db664c358ff7978b4dc21dfc"
+    }
+  }
 }

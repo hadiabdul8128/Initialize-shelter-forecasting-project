@@ -1,11 +1,11 @@
 import numpy as np
 import pandas as pd
-import pytest
 
-from shelter_forecasting.model import Candidate, recursive_forecast, train_and_evaluate
+from shelter_forecasting.forecasting import recursive_forecast
+from shelter_forecasting.model import train_and_evaluate
 
 
-def synthetic_history(days: int = 280) -> pd.DataFrame:
+def synthetic_history(days: int = 300) -> pd.DataFrame:
     time = np.arange(days)
     population = 50_000 + 8 * time + 250 * np.sin(2 * np.pi * time / 7)
     return pd.DataFrame(
@@ -16,29 +16,32 @@ def synthetic_history(days: int = 280) -> pd.DataFrame:
     )
 
 
-@pytest.mark.filterwarnings(
-    "ignore:Stochastic Optimizer.*:sklearn.exceptions.ConvergenceWarning"
-)
-def test_training_and_recursive_forecast_smoke():
+def test_all_model_families_and_recursive_forecast_smoke():
     history = synthetic_history()
-    candidates = (Candidate("test_network", (8,), 0.01),)
     result = train_and_evaluate(
         history,
         test_days=30,
         validation_days=30,
-        max_iter=80,
-        candidates=candidates,
+        xgb_estimators=20,
+        neural_epochs=40,
+        neural_patience=8,
     )
 
     forecast = recursive_forecast(
         history,
-        result["model"],
+        result["pytorch_predictor"],
         horizon=5,
         residual_quantiles=result["residual_quantiles"],
     )
 
     assert len(result["test_predictions"]) == 30
-    assert result["metadata"]["selected_candidate"]["name"] == "test_network"
+    assert set(result["metadata"]["test_metrics"]) == {
+        "sklearn_ridge",
+        "xgboost",
+        "pytorch_neural_network",
+        "naive_previous_day",
+        "seasonal_naive_7_day",
+    }
     assert len(forecast) == 5
     assert forecast["date"].min() == history["date"].max() + pd.offsets.Day(1)
     assert np.isfinite(forecast["forecast_population"]).all()

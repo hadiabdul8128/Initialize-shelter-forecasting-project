@@ -23,3 +23,5 @@ jobs:
         run: python -m ruff check .
       - name: Test
         run: python -m pytest
+      - name: Build Docker image
+        run: docker build -t shelter-forecasting:ci .

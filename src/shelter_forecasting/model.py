@@ -1,67 +1,53 @@
-"""Model selection, honest chronological evaluation, and recursive forecasting."""
+"""Scikit-learn baseline, XGBoost, PyTorch evaluation, and forecasting."""
 
-from dataclasses import asdict, dataclass
 from typing import Any
 
 import numpy as np
 import pandas as pd
-from sklearn.compose import TransformedTargetRegressor
+from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from xgboost import XGBRegressor
 
-from shelter_forecasting.features import (
-    FEATURE_COLUMNS,
-    build_supervised_frame,
-    next_feature_row,
+from shelter_forecasting.features import FEATURE_COLUMNS, build_supervised_frame
+from shelter_forecasting.neural import (
+    DEFAULT_HIDDEN_SIZES,
+    refit_neural_network,
+    train_neural_network,
 )
 
 
-@dataclass(frozen=True)
-class Candidate:
-    """A small, auditable neural-network search space."""
-
-    name: str
-    hidden_layer_sizes: tuple[int, ...]
-    alpha: float
-
-
-DEFAULT_CANDIDATES = (
-    Candidate("compact", (32,), 0.001),
-    Candidate("two_layer", (64, 32), 0.001),
-    Candidate("regularized", (64, 32), 0.01),
-)
-
-
-def make_model(
-    candidate: Candidate,
-    *,
-    random_state: int = 42,
-    max_iter: int = 1_000,
-) -> TransformedTargetRegressor:
-    """Construct a scaled multilayer perceptron regressor."""
-    network = MLPRegressor(
-        hidden_layer_sizes=candidate.hidden_layer_sizes,
-        activation="relu",
-        solver="adam",
-        alpha=candidate.alpha,
-        batch_size=32,
-        learning_rate="adaptive",
-        learning_rate_init=0.001,
-        max_iter=max_iter,
-        shuffle=False,
-        random_state=random_state,
-        tol=1e-5,
-        n_iter_no_change=50,
-    )
-    pipeline = Pipeline(
+def make_sklearn_baseline(alpha: float = 10.0) -> Pipeline:
+    """Build a regularized linear baseline for daily population change."""
+    return Pipeline(
         [
-            ("feature_scaler", StandardScaler()),
-            ("network", network),
+            ("scaler", StandardScaler()),
+            ("ridge", Ridge(alpha=alpha)),
         ]
     )
-    return TransformedTargetRegressor(regressor=pipeline, transformer=StandardScaler())
+
+
+def make_xgboost_model(
+    *,
+    n_estimators: int = 400,
+    random_state: int = 42,
+) -> XGBRegressor:
+    """Build a conservative boosted-tree model for a small daily dataset."""
+    return XGBRegressor(
+        objective="reg:squarederror",
+        n_estimators=n_estimators,
+        learning_rate=0.03,
+        max_depth=3,
+        min_child_weight=8,
+        subsample=0.85,
+        colsample_bytree=0.85,
+        reg_alpha=0.1,
+        reg_lambda=8.0,
+        random_state=random_state,
+        n_jobs=1,
+        tree_method="hist",
+    )
 
 
 def regression_metrics(actual: np.ndarray, predicted: np.ndarray) -> dict[str, float]:
@@ -81,16 +67,15 @@ def train_and_evaluate(
     test_days: int = 90,
     validation_days: int = 90,
     random_state: int = 42,
-    max_iter: int = 1_000,
-    candidates: tuple[Candidate, ...] = DEFAULT_CANDIDATES,
+    xgb_estimators: int = 400,
+    neural_epochs: int = 500,
+    neural_patience: int = 60,
 ) -> dict[str, Any]:
-    """Select a network chronologically, evaluate it, then refit on all data."""
+    """Train all three model families with chronological validation and testing."""
     supervised = build_supervised_frame(history)
     minimum_rows = test_days + validation_days + 60
     if len(supervised) < minimum_rows:
-        raise ValueError(
-            f"Need at least {minimum_rows} supervised rows; found {len(supervised)}"
-        )
+        raise ValueError(f"Need at least {minimum_rows} supervised rows; found {len(supervised)}")
 
     pretest = supervised.iloc[:-test_days]
     test = supervised.iloc[-test_days:]
@@ -100,72 +85,127 @@ def train_and_evaluate(
     x_train = train[FEATURE_COLUMNS]
     y_train_change = train["population"] - train["lag_1"]
     x_validation = validation[FEATURE_COLUMNS]
-    y_validation = validation["population"]
+    y_validation_change = validation["population"] - validation["lag_1"]
+    y_validation_level = validation["population"].to_numpy()
 
-    search_results: list[dict[str, Any]] = []
-    validation_predictions: dict[str, np.ndarray] = {}
-    for candidate in candidates:
-        model = make_model(candidate, random_state=random_state, max_iter=max_iter)
-        model.fit(x_train, y_train_change)
-        predicted = validation["lag_1"].to_numpy() + model.predict(x_validation)
-        validation_predictions[candidate.name] = predicted
-        search_results.append(
-            {
-                **asdict(candidate),
-                "hidden_layer_sizes": list(candidate.hidden_layer_sizes),
-                "validation": regression_metrics(y_validation.to_numpy(), predicted),
-            }
-        )
+    ridge_selection = make_sklearn_baseline()
+    ridge_selection.fit(x_train, y_train_change)
+    ridge_validation = validation["lag_1"].to_numpy() + ridge_selection.predict(x_validation)
 
-    selected_result = min(search_results, key=lambda item: item["validation"]["mae"])
-    selected = next(
-        candidate for candidate in candidates if candidate.name == selected_result["name"]
+    xgboost_selection = make_xgboost_model(
+        n_estimators=xgb_estimators,
+        random_state=random_state,
     )
-    residuals = y_validation.to_numpy() - validation_predictions[selected.name]
+    xgboost_selection.fit(x_train, y_train_change)
+    xgboost_validation = validation["lag_1"].to_numpy() + xgboost_selection.predict(x_validation)
+
+    neural_selection = train_neural_network(
+        x_train,
+        y_train_change,
+        x_validation,
+        y_validation_change,
+        epochs=neural_epochs,
+        patience=neural_patience,
+        random_state=random_state,
+    )
+    neural_validation = validation["lag_1"].to_numpy() + neural_selection.predict_change(
+        x_validation
+    )
+
+    validation_metrics = {
+        "sklearn_ridge": regression_metrics(y_validation_level, ridge_validation),
+        "xgboost": regression_metrics(y_validation_level, xgboost_validation),
+        "pytorch_neural_network": regression_metrics(y_validation_level, neural_validation),
+    }
+    residuals = y_validation_level - neural_validation
     residual_quantiles = {
         "lower": float(np.quantile(residuals, 0.025)),
         "upper": float(np.quantile(residuals, 0.975)),
     }
 
-    evaluation_model = make_model(selected, random_state=random_state, max_iter=max_iter)
-    evaluation_model.fit(
-        pretest[FEATURE_COLUMNS],
-        pretest["population"] - pretest["lag_1"],
-    )
-    test_prediction = test["lag_1"].to_numpy() + evaluation_model.predict(
-        test[FEATURE_COLUMNS]
-    )
+    x_pretest = pretest[FEATURE_COLUMNS]
+    y_pretest_change = pretest["population"] - pretest["lag_1"]
+    x_test = test[FEATURE_COLUMNS]
 
-    test_predictions = test[["date", "population"]].rename(
-        columns={"population": "actual"}
+    ridge_evaluation = make_sklearn_baseline()
+    ridge_evaluation.fit(x_pretest, y_pretest_change)
+    ridge_test = test["lag_1"].to_numpy() + ridge_evaluation.predict(x_test)
+
+    xgboost_evaluation = make_xgboost_model(
+        n_estimators=xgb_estimators,
+        random_state=random_state,
     )
-    test_predictions["neural_network"] = test_prediction
+    xgboost_evaluation.fit(x_pretest, y_pretest_change)
+    xgboost_test = test["lag_1"].to_numpy() + xgboost_evaluation.predict(x_test)
+
+    selected_epochs = neural_selection.best_epoch
+    neural_evaluation = refit_neural_network(
+        x_pretest,
+        y_pretest_change,
+        epochs=selected_epochs,
+        random_state=random_state,
+    )
+    neural_test = test["lag_1"].to_numpy() + neural_evaluation.predict_change(x_test)
+
+    test_predictions = test[["date", "population"]].rename(columns={"population": "actual"})
+    test_predictions["sklearn_ridge"] = ridge_test
+    test_predictions["xgboost"] = xgboost_test
+    test_predictions["pytorch_neural_network"] = neural_test
     test_predictions["naive_previous_day"] = test["lag_1"].to_numpy()
     test_predictions["seasonal_naive_7_day"] = test["lag_7"].to_numpy()
 
     test_metrics = {
-        "neural_network": regression_metrics(test_predictions["actual"], test_prediction),
-        "naive_previous_day": regression_metrics(
-            test_predictions["actual"], test_predictions["naive_previous_day"]
-        ),
-        "seasonal_naive_7_day": regression_metrics(
-            test_predictions["actual"], test_predictions["seasonal_naive_7_day"]
-        ),
+        column: regression_metrics(test_predictions["actual"], test_predictions[column])
+        for column in [
+            "sklearn_ridge",
+            "xgboost",
+            "pytorch_neural_network",
+            "naive_previous_day",
+            "seasonal_naive_7_day",
+        ]
     }
 
-    final_model = make_model(selected, random_state=random_state, max_iter=max_iter)
-    final_model.fit(
-        supervised[FEATURE_COLUMNS],
-        supervised["population"] - supervised["lag_1"],
+    x_all = supervised[FEATURE_COLUMNS]
+    y_all_change = supervised["population"] - supervised["lag_1"]
+    ridge_final = make_sklearn_baseline()
+    ridge_final.fit(x_all, y_all_change)
+    xgboost_final = make_xgboost_model(
+        n_estimators=xgb_estimators,
+        random_state=random_state,
+    )
+    xgboost_final.fit(x_all, y_all_change)
+    neural_final = refit_neural_network(
+        x_all,
+        y_all_change,
+        epochs=selected_epochs,
+        random_state=random_state,
     )
 
     metadata = {
         "target": "Total Individuals in Shelter",
         "modeled_quantity": "day-over-day population change",
+        "primary_serving_model": "pytorch_neural_network",
         "feature_count": len(FEATURE_COLUMNS),
-        "selected_candidate": selected_result,
-        "candidate_search": search_results,
+        "feature_columns": FEATURE_COLUMNS,
+        "validation_metrics": validation_metrics,
         "test_metrics": test_metrics,
+        "model_settings": {
+            "sklearn_ridge": {"alpha": 10.0},
+            "xgboost": {
+                "n_estimators": xgb_estimators,
+                "learning_rate": 0.03,
+                "max_depth": 3,
+            },
+            "pytorch_neural_network": {
+                "hidden_sizes": list(DEFAULT_HIDDEN_SIZES),
+                "dropout": 0.05,
+                "optimizer": "AdamW",
+                "loss": "HuberLoss",
+                "selected_epochs": selected_epochs,
+                "maximum_epochs": neural_epochs,
+                "patience": neural_patience,
+            },
+        },
         "splits": {
             "training_start": str(train["date"].min().date()),
             "training_end": str(train["date"].max().date()),
@@ -177,7 +217,7 @@ def train_and_evaluate(
             "validation_days": validation_days,
         },
         "residual_interval": {
-            "method": "2.5th and 97.5th percentiles of chronological validation residuals",
+            "method": ("PyTorch validation residual percentiles, widened by square-root horizon"),
             **residual_quantiles,
         },
         "random_state": random_state,
@@ -185,53 +225,11 @@ def train_and_evaluate(
     }
 
     return {
-        "model": final_model,
+        "pytorch_predictor": neural_final,
+        "ridge_model": ridge_final,
+        "xgboost_model": xgboost_final,
         "metadata": metadata,
         "test_predictions": test_predictions.reset_index(drop=True),
         "residual_quantiles": residual_quantiles,
+        "neural_training_history": neural_selection.training_history,
     }
-
-
-def recursive_forecast(
-    history: pd.DataFrame,
-    model: TransformedTargetRegressor,
-    *,
-    horizon: int,
-    residual_quantiles: dict[str, float],
-) -> pd.DataFrame:
-    """Forecast future days recursively using predicted values as new lags."""
-    if horizon < 1:
-        raise ValueError("Forecast horizon must be at least one day")
-
-    working = history[["date", "population"]].copy().sort_values("date")
-    rows: list[dict[str, Any]] = []
-    for step in range(1, horizon + 1):
-        forecast_date = pd.Timestamp(working["date"].max()) + pd.offsets.Day(1)
-        features = next_feature_row(working, forecast_date)
-        prediction = float(features.iloc[0]["lag_1"] + model.predict(features)[0])
-        interval_scale = np.sqrt(step)
-        rows.append(
-            {
-                "date": forecast_date,
-                "forecast_population": prediction,
-                "lower_95_approx": (
-                    prediction + interval_scale * residual_quantiles["lower"]
-                ),
-                "upper_95_approx": (
-                    prediction + interval_scale * residual_quantiles["upper"]
-                ),
-                "horizon_day": step,
-            }
-        )
-        working = pd.concat(
-            [
-                working,
-                pd.DataFrame({"date": [forecast_date], "population": [prediction]}),
-            ],
-            ignore_index=True,
-        )
-
-    forecast = pd.DataFrame(rows)
-    count_columns = ["forecast_population", "lower_95_approx", "upper_95_approx"]
-    forecast[count_columns] = forecast[count_columns].round().astype(int)
-    return forecast

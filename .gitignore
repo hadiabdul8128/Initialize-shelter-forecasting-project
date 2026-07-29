@@ -8,4 +8,7 @@ __pycache__/
 .coverage
 htmlcov/
 artifacts/*.joblib
+mlartifacts/
+mlflow.db
+mlruns/
 reports/*.tmp

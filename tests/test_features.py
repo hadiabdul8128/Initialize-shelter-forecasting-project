@@ -21,9 +21,10 @@ def test_features_use_only_prior_observations():
 
     assert first["lag_1"] == history.loc[source_index - 1, "population"]
     assert first["lag_56"] == history.loc[source_index - 56, "population"]
-    assert first["rolling_mean_7"] == history.loc[
-        source_index - 7 : source_index - 1, "population"
-    ].mean()
+    assert (
+        first["rolling_mean_7"]
+        == history.loc[source_index - 7 : source_index - 1, "population"].mean()
+    )
 
 
 def test_next_feature_row_uses_latest_value_as_lag_one():

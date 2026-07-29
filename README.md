@@ -1,23 +1,59 @@
 # Shelter population forecasting
 
-An end-to-end neural-network project for forecasting the daily number of people
-in New York City homeless shelters. The repository includes a reproducible data
-snapshot, leakage-safe feature engineering, chronological model selection,
-baseline comparisons, tests, and a command-line workflow.
+An end-to-end machine-learning project for forecasting the daily number of
+people in New York City homeless shelters. The primary prediction model is a
+PyTorch neural network; scikit-learn and XGBoost provide honest comparison
+models.
 
-## What the model predicts
+## Pipeline
 
-The target is **Total Individuals in Shelter**. The forecaster uses only
-information that would exist at prediction time:
+```text
+CSV file
+   ↓
+pandas — reads and sorts the daily census
+   ↓
+Pandera — validates columns, types, nonnegative counts, duplicates, and gaps
+   ↓
+NumPy — calculates calendar cycles, lags, momentum, and rolling features
+   ↓
+scikit-learn — builds the regularized Ridge baseline
+   ↓
+XGBoost — builds the boosted-tree comparison model
+   ↓
+PyTorch — builds and trains the serving neural network
+   ↓
+MLflow — records parameters, metrics, model files, and charts in local SQLite
+   ↓
+matplotlib — draws test predictions, forecasts, and training history
+   ↓
+FastAPI — serves health checks and prediction requests
+   ↓
+Docker — packages the API, model, and data snapshot
+   ↓
+Git/GitHub — versions the reproducible project
+```
 
-- prior population values at 1, 2, 3, 7, 14, 21, 28, and 56 days;
-- rolling statistics calculated from prior days;
-- weekly and annual calendar cycles; and
-- a time trend.
+No cloud account is required. MLflow uses `mlflow.db` and `mlartifacts/` in the
+local project directory by default.
 
-The other same-day census columns are deliberately excluded. They are useful
-descriptively, but their future values would not be known when making a real
-forecast and would introduce leakage.
+## Results
+
+All models learn the next-day change and add it to the previous census count.
+The latest 90 observations, April 29 through July 27, 2026, are untouched until
+the final test.
+
+| Model | MAE (people) | RMSE (people) | MAPE |
+|---|---:|---:|---:|
+| PyTorch neural network | **101.1** | **130.7** | **0.122%** |
+| XGBoost | 109.7 | 144.9 | 0.132% |
+| Previous-day naive | 118.9 | 154.1 | 0.144% |
+| scikit-learn Ridge | 124.1 | 160.6 | 0.150% |
+| Seven-day naive | 180.2 | 216.4 | 0.218% |
+
+The PyTorch network reduced MAE by **15.0%** relative to the strongest naive
+benchmark. It has hidden layers of 64 and 32 units, ReLU activations, 5%
+dropout, AdamW optimization, and Huber loss. Chronological validation selected
+176 training epochs.
 
 ## Quick start
 
@@ -30,77 +66,106 @@ python -m pip install -e ".[dev]"
 shelter-forecast train
 ```
 
-The training command:
+Training validates the data, evaluates every model, records three MLflow runs,
+refits on all available history, saves model artifacts, and creates a recursive
+14-day forecast.
 
-1. validates and sorts the daily data;
-2. reserves the latest 90 days for a final test;
-3. uses the preceding 90 days to choose among three MLP architectures;
-4. compares the selected network with previous-day and seven-day baselines;
-5. refits the selected architecture on all available history; and
-6. produces a recursive 14-day forecast.
-
-Run the quality checks with:
+Run quality checks:
 
 ```bash
 python -m ruff check .
 python -m pytest
 ```
 
-After training, reuse the saved model with:
+Reuse the saved PyTorch model:
 
 ```bash
 shelter-forecast forecast --horizon 30
 ```
 
-## Results
+## MLflow
 
-The selected network has one hidden layer with 32 units. On the untouched
-90-day test period from April 29 through July 27, 2026:
+Training uses a local SQLite backend, so no MLflow or Databricks account is
+needed. Open the experiment UI after training:
 
-| Model | MAE (people) | RMSE (people) | MAPE |
-|---|---:|---:|---:|
-| Neural network | **107.1** | **137.3** | **0.129%** |
-| Previous-day baseline | 118.9 | 154.1 | 0.144% |
-| Seven-day baseline | 180.2 | 216.4 | 0.218% |
+```bash
+mlflow server \
+  --backend-store-uri sqlite:///mlflow.db \
+  --default-artifact-root ./mlartifacts \
+  --host 127.0.0.1 \
+  --port 5000
+```
 
-The network reduced mean absolute error by 9.9% relative to the strongest
-baseline. These scores describe one-day-ahead conditional forecasts, not the
-full recursive 14-day path.
+Then visit `http://127.0.0.1:5000`.
+
+## FastAPI
+
+Start the service:
+
+```bash
+shelter-forecast serve
+```
+
+Interactive documentation is available at `http://127.0.0.1:8000/docs`.
+
+Request a forecast from the bundled history:
+
+```bash
+curl -X POST http://127.0.0.1:8000/forecast \
+  -H "Content-Type: application/json" \
+  -d '{"horizon": 14}'
+```
+
+The request may also contain `observations`, a list of at least 56 consecutive
+objects with `date` and `population`. Pandera validates supplied history before
+inference. Forecast horizons are limited to 1–90 days.
+
+## Docker
+
+Build and run the same prediction service:
+
+```bash
+docker build -t shelter-forecasting:local .
+docker run --rm -p 8000:8000 shelter-forecasting:local
+```
+
+Check the container:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
 
 ## Outputs
 
-- `reports/metrics.json`: model selection, split dates, and final test metrics
-- `reports/test_predictions.csv`: actual and predicted values in the holdout
-- `reports/forecast.csv`: future point forecasts and approximate intervals
-- `reports/forecast.png`: diagnostic and forecast chart
-- `artifacts/shelter_mlp.joblib`: local reusable model bundle (git-ignored)
+- `artifacts/pytorch_model.pt`: framework-native PyTorch weights used by the API
+- `artifacts/neural_metadata.json`: feature scaling and serving metadata
+- `artifacts/xgboost_model.json`: reusable boosted-tree model
+- `reports/metrics.json`: validation/test metrics and MLflow run IDs
+- `reports/test_predictions.csv`: actual values and every model prediction
+- `reports/forecast.csv`: recursive PyTorch forecast and approximate intervals
+- `reports/forecast.png`: holdout comparison and forecast chart
+- `reports/neural_training.png`: PyTorch learning curves
+- `mlflow.db` and `mlartifacts/`: local MLflow state, intentionally git-ignored
 
-The interval is based on validation residual quantiles and widens with the
-square root of the forecast horizon. It is an approximate error band, not a
+The interval uses PyTorch validation residual quantiles and widens with the
+square root of the horizon. It is an approximate error band rather than a
 calibrated probabilistic forecast.
 
-## Data
+## Data and leakage controls
 
-The included snapshot, `data/raw/DHS_Homeless_Shelter_Census_20260728.csv`,
-contains 1,975 complete daily observations from March 1, 2021 through July 27,
-2026. It has no missing calendar days, duplicate dates, or null values.
+The included snapshot has 1,975 complete daily observations from March 1, 2021
+through July 27, 2026. It has no missing days, duplicate dates, negative counts,
+or nulls.
 
-The dataset is aggregate census data and contains no person-level records.
+Only information available before each prediction is used:
 
-## Model and evaluation
+- population lags at 1, 2, 3, 7, 14, 21, 28, and 56 days;
+- 7-, 14-, and 28-day rolling statistics calculated after a one-day shift;
+- weekly and annual calendar cycles;
+- time trend and lag momentum.
 
-The model is a scikit-learn `MLPRegressor`: a feed-forward multilayer
-perceptron with ReLU activations. It learns the day-over-day population change
-and adds that change to the previous census count. This residual formulation
-gives the network a strong persistence anchor. Inputs and the change target are
-standardized during training. Architecture selection and final evaluation are
-separated in time so the reported test period is not used to select the
-network.
-
-The test metrics in `reports/metrics.json` are one-day-ahead conditional
-forecasts: each test row uses the population history that would have been
-observed before that date. Future forecasts are recursive, so uncertainty and
-error can grow with the horizon.
+Same-day shelter-category fields are excluded because they would be unknown for
+a future date and would leak information into the model.
 
 ## Limitations
 
@@ -108,7 +173,7 @@ error can grow with the horizon.
 - Structural breaks, policy changes, extreme weather, migration, and capacity
   changes are not represented directly.
 - Daily census history alone cannot explain why demand changes.
-- Retrain after adding new observations and monitor performance against the
-  included baselines.
-- Before production use, add forecast monitoring, stronger uncertainty
-  calibration, and relevant external drivers with publication-time checks.
+- Retrain after adding new observations and monitor performance against both
+  naive and trained baselines.
+- Production deployment should add authentication, request logging, monitoring,
+  calibrated uncertainty, and external drivers with publication-time checks.

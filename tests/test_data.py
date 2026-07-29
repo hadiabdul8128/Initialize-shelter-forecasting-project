@@ -41,3 +41,13 @@ def test_load_census_rejects_missing_day(tmp_path):
 
     with pytest.raises(ValueError, match="Missing daily observations"):
         load_census(path)
+
+
+def test_pandera_rejects_negative_population(tmp_path):
+    frame = source_frame(pd.date_range("2026-01-01", periods=3, freq="D"))
+    frame.loc[1, "Total Individuals in Shelter"] = -1
+    path = tmp_path / "census.csv"
+    frame.to_csv(path, index=False)
+
+    with pytest.raises(ValueError, match="schema validation failed"):
+        load_census(path)
