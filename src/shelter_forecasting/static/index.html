@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Estimate NYC homeless shelter population for a selected date using a PyTorch forecasting model."
+    />
+    <title>Shelter Population Forecast</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to estimator</a>
+
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Shelter Population Forecast home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>Shelter Population Forecast</span>
+      </a>
+      <div class="model-status" id="model-status">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span>Checking model</span>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <section class="hero" aria-labelledby="page-title">
+        <p class="eyebrow">NYC DAILY SHELTER CENSUS</p>
+        <h1 id="page-title">Estimate shelter population by date.</h1>
+        <p class="hero-copy">
+          Select today or another date. Recorded dates return the published
+          census; later dates use the trained PyTorch neural network.
+        </p>
+      </section>
+
+      <section class="estimator-shell" aria-label="Population estimator">
+        <form class="estimator-form" id="estimate-form">
+          <div>
+            <p class="section-label">Choose a date</p>
+            <label for="target-date">Date to estimate</label>
+            <input id="target-date" name="target-date" type="date" required />
+            <p class="helper-text" id="date-help">
+              Loading the available date range…
+            </p>
+          </div>
+
+          <button type="submit" id="estimate-button">
+            <span class="button-label">Estimate population</span>
+            <span class="button-progress" aria-hidden="true"></span>
+          </button>
+          <p class="form-error" id="form-error" role="alert"></p>
+        </form>
+
+        <section
+          class="result-card is-empty"
+          id="result-card"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <p class="result-kicker" id="result-kicker">Ready when you are</p>
+          <p class="result-number" id="result-number">—</p>
+          <p class="result-date" id="result-date">
+            Choose a date to see a population value.
+          </p>
+          <div class="result-details" id="result-details" hidden>
+            <div>
+              <span class="detail-label">Approximate range</span>
+              <strong id="result-range">—</strong>
+            </div>
+            <div>
+              <span class="detail-label">Based on census through</span>
+              <strong id="result-as-of">—</strong>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="method" aria-labelledby="method-title">
+        <div>
+          <p class="section-label">What is behind the number?</p>
+          <h2 id="method-title">A forecast grounded in recent history.</h2>
+        </div>
+        <div class="method-grid">
+          <article>
+            <span class="step-number">01</span>
+            <h3>Validated data</h3>
+            <p>Daily census records are checked for missing dates and invalid values.</p>
+          </article>
+          <article>
+            <span class="step-number">02</span>
+            <h3>27 historical signals</h3>
+            <p>The model uses recent counts, weekly patterns, rolling averages, and trends.</p>
+          </article>
+          <article>
+            <span class="step-number">03</span>
+            <h3>PyTorch estimate</h3>
+            <p>The neural network averaged about 101 people of error in its final test.</p>
+          </article>
+        </div>
+      </section>
+
+      <aside class="notice">
+        <strong>Use this as a planning estimate.</strong>
+        <span>
+          It does not account directly for policy changes, extreme weather, migration,
+          or shelter capacity decisions.
+        </span>
+      </aside>
+    </main>
+
+    <footer>
+      <span>Model trained through July 27, 2026</span>
+      <a href="/docs">View API documentation</a>
+    </footer>
+  </body>
+</html>

@@ -106,7 +106,16 @@ Start the service:
 shelter-forecast serve
 ```
 
-Interactive documentation is available at `http://127.0.0.1:8000/docs`.
+Open `http://127.0.0.1:8000` to use the date estimator. The page defaults to
+the current date and shows either the recorded census or a PyTorch forecast
+with an approximate range. Interactive API documentation is available at
+`http://127.0.0.1:8000/docs`.
+
+Request one date directly:
+
+```bash
+curl "http://127.0.0.1:8000/api/estimate?target_date=2026-07-29"
+```
 
 Request a forecast from the bundled history:
 
@@ -119,6 +128,10 @@ curl -X POST http://127.0.0.1:8000/forecast \
 The request may also contain `observations`, a list of at least 56 consecutive
 objects with `date` and `population`. Pandera validates supplied history before
 inference. Forecast horizons are limited to 1–90 days.
+
+The date estimator accepts dates from March 1, 2021 through 90 days after the
+latest observation. Historical dates return the recorded value; later dates
+return the recursive neural-network estimate.
 
 ## Docker
 

@@ -44,6 +44,9 @@ shelter-forecast = "shelter_forecasting.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+shelter_forecasting = ["static/*.css", "static/*.html", "static/*.js"]
+
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
