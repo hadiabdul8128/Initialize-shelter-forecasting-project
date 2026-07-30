@@ -1,6 +1,6 @@
 # NYC shelter population forecast
 
-This project estimates how many people will be in New York City homeless
+This project uses a PyTorch feed-forward neural network model to estimates how many people will be in New York City homeless
 shelters on a selected date.
 
 The website has one date field. For a date already covered by the census data,
