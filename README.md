@@ -1,36 +1,52 @@
-# Shelter population forecasting
+# NYC shelter population forecast
 
-An end-to-end machine-learning project for forecasting the daily number of
-people in New York City homeless shelters. The primary prediction model is a
-PyTorch neural network; scikit-learn and XGBoost provide honest comparison
-models.
+This project estimates how many people will be in New York City homeless
+shelters on a selected date.
+
+The website has one date field. For a date already covered by the census data,
+it returns the recorded population. For a later date, it asks a trained PyTorch
+neural network for an estimate and shows an approximate range around that
+number.
+
+The latest census record in this version is July 27, 2026. Forecasts are
+available for the following 90 days. These numbers are meant for planning and
+testing. They are not official census totals or staffing guarantees.
+
+## What is included
+
+- A simple website for choosing a date and viewing the result
+- A FastAPI endpoint that the website uses to request estimates
+- A PyTorch neural network trained on daily shelter census history
+- Ridge and XGBoost models used to compare performance
+- Data checks, saved model files, test reports, and charts
+- Docker support for running the same website and API in a container
 
 ## Pipeline
 
 ```text
 CSV file
    ↓
-pandas — reads and sorts the daily census
+pandas: reads and sorts the daily census
    ↓
-Pandera — validates columns, types, nonnegative counts, duplicates, and gaps
+Pandera: validates columns, types, nonnegative counts, duplicates, and gaps
    ↓
-NumPy — calculates calendar cycles, lags, momentum, and rolling features
+NumPy: calculates calendar cycles, lags, momentum, and rolling features
    ↓
-scikit-learn — builds the regularized Ridge baseline
+scikit-learn: builds the regularized Ridge baseline
    ↓
-XGBoost — builds the boosted-tree comparison model
+XGBoost: builds the boosted-tree comparison model
    ↓
-PyTorch — builds and trains the serving neural network
+PyTorch: builds and trains the serving neural network
    ↓
-MLflow — records parameters, metrics, model files, and charts in local SQLite
+MLflow: records parameters, metrics, model files, and charts in local SQLite
    ↓
-matplotlib — draws test predictions, forecasts, and training history
+matplotlib: draws test predictions, forecasts, and training history
    ↓
-FastAPI — serves health checks and prediction requests
+FastAPI: serves health checks and prediction requests
    ↓
-Docker — packages the API, model, and data snapshot
+Docker: packages the API, model, and data snapshot
    ↓
-Git/GitHub — versions the reproducible project
+Git/GitHub: saves the project history
 ```
 
 No cloud account is required. MLflow uses `mlflow.db` and `mlartifacts/` in the
@@ -127,7 +143,7 @@ curl -X POST http://127.0.0.1:8000/forecast \
 
 The request may also contain `observations`, a list of at least 56 consecutive
 objects with `date` and `population`. Pandera validates supplied history before
-inference. Forecast horizons are limited to 1–90 days.
+inference. Forecast horizons are limited to 1 to 90 days.
 
 The date estimator accepts dates from March 1, 2021 through 90 days after the
 latest observation. Historical dates return the recorded value; later dates
@@ -182,7 +198,8 @@ a future date and would leak information into the model.
 
 ## Limitations
 
-- This is a decision-support prototype, not an operational staffing guarantee.
+- This is an experimental forecasting tool, not an operational staffing
+  guarantee.
 - Structural breaks, policy changes, extreme weather, migration, and capacity
   changes are not represented directly.
 - Daily census history alone cannot explain why demand changes.
