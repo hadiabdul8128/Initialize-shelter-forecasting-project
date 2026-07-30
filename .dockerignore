@@ -1,0 +1,12 @@
+.git
+.github
+.pytest_cache
+.ruff_cache
+.venv
+__pycache__
+artifacts/*.joblib
+mlartifacts
+mlflow.db
+mlruns
+reports
+tests
